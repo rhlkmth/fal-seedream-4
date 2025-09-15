@@ -46,7 +46,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-
 # --- Main Application ---
 st.title("Seedream 4.0 Creative Studio")
 st.write("Choose your creative tool below.")
@@ -63,7 +62,6 @@ with tab1:
     st.header("Generate Images from Text")
     st.markdown("Describe the image you want to create. The more detailed your prompt, the better the result.")
 
-    # Input and Settings columns
     col1, col2 = st.columns([2, 1])
 
     with col1:
@@ -87,7 +85,6 @@ with tab1:
             max_images_t2i = st.slider("Max Images per Generation", 1, 6, 1, key="max_images_t2i")
             seed_t2i = st.number_input("Seed (0 for random)", value=0, min_value=0, key="seed_t2i")
 
-    # Generate Button and Output Area
     if st.button("Generate Image(s)", type="primary"):
         if not FAL_KEY:
             st.error("🔑 Fal AI API Key is missing. Please enter your key in the sidebar.")
@@ -120,7 +117,8 @@ with tab1:
                         cols = st.columns(len(result["images"]))
                         for i, image in enumerate(result["images"]):
                             with cols[i]:
-                                st.image(image["url"], caption=f"Generated Image {i+1}", use_column_width=True)
+                                # --- CORRECTED PARAMETER ---
+                                st.image(image["url"], caption=f"Generated Image {i+1}", use_container_width=True)
                     else:
                         st.warning("The API did not return any images.")
                         st.json(result)
@@ -140,7 +138,7 @@ with tab2:
     with col1:
         prompt_edit = st.text_area(
             "**Editing Instructions:**",
-            "Change the background to a snowy mountain landscape.",
+            "Change the background to a snowy mountain landscape, 4k, cinematic.",
             height=100,
             key="prompt_edit"
         )
@@ -154,12 +152,28 @@ with tab2:
     with col2:
         with st.container(border=True):
             st.subheader("Settings")
-            image_size_option_edit = st.selectbox(
-                "Output Size",
-                ["Square (1280x1280)", "Portrait (1024x1792)", "Landscape (1792x1024)"],
-                index=0,
-                key="size_edit"
-            )
+            
+            size_presets = {
+                "4K Landscape (3840x2160)": (3840, 2160),
+                "4K Portrait (2160x3840)": (2160, 3840),
+                "Full HD Landscape (1920x1080)": (1920, 1080),
+                "Square HD (2048x2048)": (2048, 2048),
+                "Custom": (None, None)
+            }
+            preset_choice = st.selectbox("Output Size Preset", options=list(size_presets.keys()), index=0)
+            
+            c1, c2 = st.columns(2)
+            
+            default_w, default_h = size_presets["4K Landscape (3840x2160)"]
+
+            if preset_choice != "Custom":
+                default_w, default_h = size_presets[preset_choice]
+
+            edit_width = c1.number_input("Width", min_value=1024, max_value=4096, value=default_w, step=64)
+            edit_height = c2.number_input("Height", min_value=1024, max_value=4096, value=default_h, step=64)
+            
+            st.markdown("---")
+            
             num_images_edit = st.slider("Number of Generations", 1, 6, 1, key="num_images_edit")
             max_images_edit = st.slider("Max Images per Generation", 1, 6, 1, key="max_images_edit")
             seed_edit = st.number_input("Seed (0 for random)", value=0, min_value=0, key="seed_edit")
@@ -176,15 +190,13 @@ with tab2:
                     if not image_urls:
                          st.warning("No valid image URLs were found.")
                     else:
-                        image_size_map = {
-                            "Square (1280x1280)": {"width": 1280, "height": 1280},
-                            "Portrait (1024x1792)": {"width": 1024, "height": 1792},
-                            "Landscape (1792x1024)": {"width": 1792, "height": 1024}
-                        }
                         payload = {
                             "prompt": prompt_edit,
                             "image_urls": image_urls,
-                            "image_size": image_size_map[image_size_option_edit],
+                            "image_size": {
+                                "width": edit_width,
+                                "height": edit_height
+                            },
                             "num_images": num_images_edit,
                             "max_images": max_images_edit,
                             "enable_safety_checker": False
@@ -192,14 +204,13 @@ with tab2:
                         if seed_edit > 0:
                             payload["seed"] = seed_edit
 
-                        # --- Display Input Images ---
                         st.subheader("Your Input Image(s)")
-                        in_cols = st.columns(len(image_urls))
+                        in_cols = st.columns(min(len(image_urls), 4))
                         for i, url in enumerate(image_urls):
-                             with in_cols[i]:
-                                 st.image(url, caption=f"Input {i+1}", use_column_width=True)
+                             with in_cols[i % 4]:
+                                 # --- CORRECTED PARAMETER ---
+                                 st.image(url, caption=f"Input {i+1}", use_container_width=True)
                         st.markdown("---")
-
 
                         result = make_api_request(IMAGE_EDIT_URL, payload, FAL_KEY)
 
@@ -211,7 +222,8 @@ with tab2:
                             out_cols = st.columns(len(result["images"]))
                             for i, image in enumerate(result["images"]):
                                 with out_cols[i]:
-                                    st.image(image["url"], caption=f"Edited Image {i+1}", use_column_width=True)
+                                    # --- CORRECTED PARAMETER ---
+                                    st.image(image["url"], caption=f"Edited Image {i+1}", use_container_width=True)
                         else:
                             st.warning("The API did not return any edited images.")
                             st.json(result)

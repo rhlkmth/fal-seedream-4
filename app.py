@@ -5,128 +5,218 @@ import time
 
 # --- App Configuration ---
 st.set_page_config(
-    page_title="Fal AI Image Factory 4.0",
-    page_icon="🎨",
+    page_title="Seedream 4.0 Studio",
+    page_icon="✨",
     layout="wide"
 )
 
 # --- API Configuration ---
-API_URL = "https://fal.run/fal-ai/bytedance/seedream/v4/text-to-image"
+TEXT_TO_IMAGE_URL = "https://fal.run/fal-ai/bytedance/seedream/v4/text-to-image"
+IMAGE_EDIT_URL = "https://fal.run/fal-ai/bytedance/seedream/v4/edit"
 
-# --- Sidebar for User Inputs ---
+# --- Helper Functions ---
+def make_api_request(url, payload, api_key):
+    """Handles making the API request and returns the response."""
+    headers = {
+        "Authorization": f"Key {api_key}",
+        "Content-Type": "application/json"
+    }
+    response = requests.post(url, headers=headers, json=payload, timeout=300)
+    response.raise_for_status()
+    return response.json()
+
+# --- Sidebar ---
 with st.sidebar:
-    st.header("🎨 Fal AI Image Factory 4.0")
-    st.write("Generate images using the Bytedance Seedream 4.0 model.")
+    st.header("✨ Seedream 4.0 Studio")
+    st.write("A creative space for generating and editing images with Bytedance's Seedream 4.0 model via the Fal AI API.")
 
-    # User input for API Key
-    st.subheader("API Configuration")
+    st.subheader("🔑 API Configuration")
     user_api_key = st.text_input(
         "Enter your Fal AI API Key:",
         type="password",
-        help="You can get your API key from the Fal AI website."
+        help="Get your API key from the Fal AI website."
     )
-    st.caption("Your API key is not stored. It is only used for the current session.")
-
+    st.caption("Your API key is used only for this session and is not stored.")
     st.markdown("---")
-
-    # Prompt and settings
-    st.subheader("Generation Settings")
-    prompt = st.text_area(
-        "Enter your creative prompt:",
-        "A majestic lion wearing a crown, sitting on a throne in a futuristic city, cinematic lighting",
-        height=150
+    st.info("💡 **Tip:** All settings for generation and editing are available within their respective tabs in the main window.")
+    st.markdown("---")
+    st.markdown(
+        "Made with ❤️ by the community <br>"
+        "Powered by [Fal AI](https://fal.ai/) and [Streamlit](https://streamlit.io/)",
+        unsafe_allow_html=True,
     )
 
-    image_size_option = st.selectbox(
-        "Image Size:",
-        ["Square (1280x1280)", "Portrait (1024x1792)", "Landscape (1792x1024)"],
-        index=0
-    )
 
-    num_images = st.slider("Number of Generations:", 1, 6, 1)
-    max_images = st.slider("Max Images per Generation:", 1, 6, 1)
+# --- Main Application ---
+st.title("Seedream 4.0 Creative Studio")
+st.write("Choose your creative tool below.")
 
-    # Advanced options
-    with st.expander("Advanced Settings"):
-        # Use a unique key for the number_input to allow dynamic updates
-        if 'seed_value' not in st.session_state:
-            st.session_state.seed_value = 0
+# --- Tabs for Different Modes ---
+tab1, tab2 = st.tabs(["🎨 **Text-to-Image**", "✏️ **Image Editing**"])
 
-        seed = st.number_input("Seed (0 for random):", value=st.session_state.seed_value, min_value=0)
-        if st.button("Randomize Seed"):
-            st.session_state.seed_value = int(time.time())
-            st.rerun() # Rerun the app to update the number_input value
-
-# --- Determine which API key to use ---
-# Priority: User input > Streamlit secrets > Environment variable
+# Determine which API key to use
 FAL_KEY = user_api_key or st.secrets.get("FAL_KEY", os.environ.get("FAL_KEY"))
 
-# --- Main Panel for Image Display ---
-st.title("🖼️ Your Generated Images")
 
-# "Generate" button
-if st.button("Generate Image(s)"):
-    if not FAL_KEY:
-        st.error("Fal AI API Key is missing. Please enter your key in the sidebar to proceed.")
-    elif not prompt:
-        st.warning("Please enter a prompt to generate an image.")
-    else:
-        # --- Prepare API Payload ---
-        image_size_map = {
-            "Square (1280x1280)": {"width": 1280, "height": 1280},
-            "Portrait (1024x1792)": {"width": 1024, "height": 1792},
-            "Landscape (1792x1024)": {"width": 1792, "height": 1024}
-        }
+# --- TAB 1: Text-to-Image ---
+with tab1:
+    st.header("Generate Images from Text")
+    st.markdown("Describe the image you want to create. The more detailed your prompt, the better the result.")
 
-        payload = {
-            "prompt": prompt,
-            "image_size": image_size_map[image_size_option],
-            "num_images": num_images,
-            "max_images": max_images,
-            "enable_safety_checker": False
-        }
-        # Only add the seed if it's not 0, as 0 means random
-        if seed > 0:
-            payload["seed"] = seed
+    # Input and Settings columns
+    col1, col2 = st.columns([2, 1])
 
-        # --- API Call ---
-        with st.spinner("Generating your masterpiece... This might take a moment."):
-            try:
-                headers = {
-                    "Authorization": f"Key {FAL_KEY}",
-                    "Content-Type": "application/json"
-                }
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=300)
-                response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+    with col1:
+        prompt_t2i = st.text_area(
+            "**Prompt:**",
+            "A majestic lion wearing a crown, sitting on a throne in a futuristic city, cinematic lighting, 8k, hyper-detailed",
+            height=150,
+            key="prompt_t2i"
+        )
 
-                result = response.json()
+    with col2:
+        with st.container(border=True):
+            st.subheader("Settings")
+            image_size_option_t2i = st.selectbox(
+                "Image Size",
+                ["Square (1280x1280)", "Portrait (1024x1792)", "Landscape (1792x1024)"],
+                index=0,
+                key="size_t2i"
+            )
+            num_images_t2i = st.slider("Number of Generations", 1, 6, 1, key="num_images_t2i")
+            max_images_t2i = st.slider("Max Images per Generation", 1, 6, 1, key="max_images_t2i")
+            seed_t2i = st.number_input("Seed (0 for random)", value=0, min_value=0, key="seed_t2i")
 
-                # --- Display Images ---
-                if "images" in result and result["images"]:
-                    st.success(f"Successfully generated {len(result['images'])} image(s)!")
-                    
-                    # Create columns dynamically based on the number of images
-                    cols = st.columns(len(result["images"]))
-                    for i, image in enumerate(result["images"]):
-                        with cols[i]:
-                            st.image(image["url"], caption=f"Generated Image {i+1}", use_column_width=True)
-                    
-                    st.info(f"Seed used for generation: {result.get('seed', 'N/A')}")
-                else:
-                    st.warning("The API did not return any images. Please try a different prompt or settings.")
-                    st.json(result) # Show the raw response for debugging
+    # Generate Button and Output Area
+    if st.button("Generate Image(s)", type="primary"):
+        if not FAL_KEY:
+            st.error("🔑 Fal AI API Key is missing. Please enter your key in the sidebar.")
+        elif not prompt_t2i:
+            st.warning("Please enter a prompt to generate an image.")
+        else:
+            with st.spinner("🚀 Launching the creative rockets... This might take a moment."):
+                try:
+                    image_size_map = {
+                        "Square (1280x1280)": {"width": 1280, "height": 1280},
+                        "Portrait (1024x1792)": {"width": 1024, "height": 1792},
+                        "Landscape (1792x1024)": {"width": 1792, "height": 1024}
+                    }
+                    payload = {
+                        "prompt": prompt_t2i,
+                        "image_size": image_size_map[image_size_option_t2i],
+                        "num_images": num_images_t2i,
+                        "max_images": max_images_t2i,
+                        "enable_safety_checker": False
+                    }
+                    if seed_t2i > 0:
+                        payload["seed"] = seed_t2i
 
-            except requests.exceptions.HTTPError as e:
-                st.error(f"API Request Failed: {e.response.status_code} - {e.response.text}")
-            except requests.exceptions.RequestException as e:
-                st.error(f"Network or request error: {e}")
-            except Exception as e:
-                st.error(f"An unexpected error occurred: {e}")
+                    result = make_api_request(TEXT_TO_IMAGE_URL, payload, FAL_KEY)
 
-# --- Instructions for getting started ---
-st.markdown("---")
-st.markdown("### How to Use:")
-st.markdown("1. **Enter your Fal AI API Key** in the sidebar. You can obtain one from the [Fal AI website](https://fal.ai/).")
-st.markdown("2. **Enter your desired prompt** in the text area.")
-st.markdown("3. **Adjust the settings** like image size and number of images.")
-st.markdown("4. **Click 'Generate Image(s)'** to see the magic happen!")
+                    if "images" in result and result["images"]:
+                        st.success(f"Successfully generated {len(result['images'])} image(s)!")
+                        st.info(f"**Seed used:** {result.get('seed', 'N/A')}")
+
+                        cols = st.columns(len(result["images"]))
+                        for i, image in enumerate(result["images"]):
+                            with cols[i]:
+                                st.image(image["url"], caption=f"Generated Image {i+1}", use_column_width=True)
+                    else:
+                        st.warning("The API did not return any images.")
+                        st.json(result)
+
+                except requests.exceptions.HTTPError as e:
+                    st.error(f"API Request Failed: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred: {e}")
+
+# --- TAB 2: Image Editing ---
+with tab2:
+    st.header("Edit Images with Instructions")
+    st.markdown("Provide one or more image URLs and describe the changes you want to make.")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        prompt_edit = st.text_area(
+            "**Editing Instructions:**",
+            "Change the background to a snowy mountain landscape.",
+            height=100,
+            key="prompt_edit"
+        )
+        image_urls_text = st.text_area(
+            "**Image URLs (one per line):**",
+            "https://storage.googleapis.com/falserverless/example_inputs/seedream4_edit_input_1.png",
+            height=150,
+            key="image_urls"
+        )
+
+    with col2:
+        with st.container(border=True):
+            st.subheader("Settings")
+            image_size_option_edit = st.selectbox(
+                "Output Size",
+                ["Square (1280x1280)", "Portrait (1024x1792)", "Landscape (1792x1024)"],
+                index=0,
+                key="size_edit"
+            )
+            num_images_edit = st.slider("Number of Generations", 1, 6, 1, key="num_images_edit")
+            max_images_edit = st.slider("Max Images per Generation", 1, 6, 1, key="max_images_edit")
+            seed_edit = st.number_input("Seed (0 for random)", value=0, min_value=0, key="seed_edit")
+
+    if st.button("Edit Image(s)", type="primary"):
+        if not FAL_KEY:
+            st.error("🔑 Fal AI API Key is missing. Please enter your key in the sidebar.")
+        elif not prompt_edit or not image_urls_text:
+            st.warning("Please provide editing instructions and at least one image URL.")
+        else:
+            with st.spinner("🎨 Applying artistic edits... Please wait."):
+                try:
+                    image_urls = [url.strip() for url in image_urls_text.strip().split('\n') if url.strip()]
+                    if not image_urls:
+                         st.warning("No valid image URLs were found.")
+                    else:
+                        image_size_map = {
+                            "Square (1280x1280)": {"width": 1280, "height": 1280},
+                            "Portrait (1024x1792)": {"width": 1024, "height": 1792},
+                            "Landscape (1792x1024)": {"width": 1792, "height": 1024}
+                        }
+                        payload = {
+                            "prompt": prompt_edit,
+                            "image_urls": image_urls,
+                            "image_size": image_size_map[image_size_option_edit],
+                            "num_images": num_images_edit,
+                            "max_images": max_images_edit,
+                            "enable_safety_checker": False
+                        }
+                        if seed_edit > 0:
+                            payload["seed"] = seed_edit
+
+                        # --- Display Input Images ---
+                        st.subheader("Your Input Image(s)")
+                        in_cols = st.columns(len(image_urls))
+                        for i, url in enumerate(image_urls):
+                             with in_cols[i]:
+                                 st.image(url, caption=f"Input {i+1}", use_column_width=True)
+                        st.markdown("---")
+
+
+                        result = make_api_request(IMAGE_EDIT_URL, payload, FAL_KEY)
+
+                        st.subheader("Your Edited Result(s)")
+                        if "images" in result and result["images"]:
+                            st.success(f"Successfully edited and generated {len(result['images'])} image(s)!")
+                            st.info(f"**Seed used:** {result.get('seed', 'N/A')}")
+
+                            out_cols = st.columns(len(result["images"]))
+                            for i, image in enumerate(result["images"]):
+                                with out_cols[i]:
+                                    st.image(image["url"], caption=f"Edited Image {i+1}", use_column_width=True)
+                        else:
+                            st.warning("The API did not return any edited images.")
+                            st.json(result)
+
+                except requests.exceptions.HTTPError as e:
+                    st.error(f"API Request Failed: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred: {e}")

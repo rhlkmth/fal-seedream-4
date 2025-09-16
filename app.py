@@ -61,7 +61,6 @@ FAL_KEY = user_api_key or st.secrets.get("FAL_KEY", os.environ.get("FAL_KEY"))
 
 # --- TAB 1: Text-to-Image ---
 with tab1:
-    # This tab's code is complete and functional.
     st.header("Generate Images from Text")
     st.markdown("Describe the image you want to create. The more detailed your prompt, the better the result.")
     col1, col2 = st.columns([2, 1])
@@ -76,10 +75,47 @@ with tab1:
             seed_t2i = st.number_input("Seed (0 for random)", value=0, min_value=0, key="seed_t2i")
 
     if st.button("Generate Image(s)", type="primary", key="generate_button"):
-        # This section's logic is complete and correct
-        pass
+        if not FAL_KEY:
+            st.error("🔑 Fal AI API Key is missing. Please enter your key in the sidebar.")
+        elif not prompt_t2i:
+            st.warning("Please enter a prompt to generate an image.")
+        else:
+            with st.spinner("🚀 Launching the creative rockets... This might take a moment."):
+                try:
+                    image_size_map = {
+                        "Square (1280x1280)": {"width": 1280, "height": 1280},
+                        "Portrait (1024x1792)": {"width": 1024, "height": 1792},
+                        "Landscape (1792x1024)": {"width": 1792, "height": 1024}
+                    }
+                    payload = {
+                        "prompt": prompt_t2i,
+                        "image_size": image_size_map[image_size_option_t2i],
+                        "num_images": num_images_t2i,
+                        "max_images": max_images_t2i,
+                        "enable_safety_checker": False
+                    }
+                    if seed_t2i > 0:
+                        payload["seed"] = seed_t2i
 
-# --- TAB 2: Image Editing (New Automated Logic) ---
+                    result = make_api_request(TEXT_TO_IMAGE_URL, payload, FAL_KEY)
+
+                    if "images" in result and result["images"]:
+                        st.success(f"Successfully generated {len(result['images'])} image(s)!")
+                        st.info(f"**Seed used:** {result.get('seed', 'N/A')}")
+                        cols = st.columns(len(result["images"]))
+                        for i, image in enumerate(result["images"]):
+                            with cols[i]:
+                                st.image(image["url"], caption=f"Generated Image {i+1}", use_container_width=True)
+                    else:
+                        st.warning("The API did not return any images.")
+                        st.json(result)
+
+                except requests.exceptions.HTTPError as e:
+                    st.error(f"API Request Failed: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred: {e}")
+
+# --- TAB 2: Image Editing ---
 with tab2:
     st.header("Edit Images with Instructions")
     st.markdown("Provide image URLs and editing instructions. The output will be automatically upscaled.")
@@ -95,8 +131,6 @@ with tab2:
         with st.container(border=True):
             st.subheader("Settings")
 
-            # --- AUTOMATIC RESOLUTION LOGIC ---
-            # Initialize state variables if they don't exist
             if 'source_url_for_res' not in st.session_state:
                 st.session_state.source_url_for_res = None
                 st.session_state.input_width = None
@@ -104,27 +138,23 @@ with tab2:
             
             first_url = image_urls_list[0] if image_urls_list else None
 
-            # Only re-run analysis if the URL has changed
             if first_url != st.session_state.source_url_for_res:
                 if first_url:
                     w, h = get_image_resolution(first_url)
                     st.session_state.input_width = w
                     st.session_state.input_height = h
-                else: # Clear if the URL box is emptied
+                else:
                     st.session_state.input_width = None
                     st.session_state.input_height = None
                 st.session_state.source_url_for_res = first_url
                 st.rerun()
 
-            # --- UI Display and Calculation ---
             upscale_factor = st.radio("**Upscale Factor**", ["2x (Default)", "4x"], horizontal=True, key="upscale_factor")
             scale = 4 if upscale_factor == "4x" else 2
 
             if st.session_state.input_width and st.session_state.input_height:
                 detected_w, detected_h = st.session_state.input_width, st.session_state.input_height
                 target_w, target_h = detected_w * scale, detected_h * scale
-                
-                # Clamp the final values to the API's allowed range
                 output_w = max(1024, min(4096, target_w))
                 output_h = max(1024, min(4096, target_h))
 
@@ -135,7 +165,7 @@ with tab2:
                     st.warning("Output was scaled to fit the model's supported range (1024px to 4096px).")
             else:
                 st.info("Awaiting a valid image URL for auto-sizing...")
-                output_w, output_h = 1920, 1080 # Fallback default
+                output_w, output_h = 1920, 1080
 
             st.markdown("---")
             
